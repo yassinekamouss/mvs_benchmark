@@ -1,0 +1,21 @@
+# --- Manipulation 3D & Calcul Scientifique ---
+open3d>=0.18.0
+numpy>=1.24.0,<2.0.0
+scipy>=1.11.0
+trimesh>=4.0.0
+plyfile>=1.0.0
+
+# --- Vision par Ordinateur & Traitement d'Images ---
+opencv-python>=4.8.0
+Pillow>=10.0.0
+
+# --- Interface Graphique & Visualisation ---
+streamlit>=1.32.0
+plotly>=5.19.0
+matplotlib>=3.8.0
+pandas>=2.1.0
+
+# --- Configuration, Réseau & Utilitaires ---
+pyyaml>=6.0.1
+requests>=2.31.0
+tqdm>=4.66.0

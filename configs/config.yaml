@@ -1,0 +1,52 @@
+# ============================================================================
+# CONFIGURATION GLOBALE - MVS 3D RECONSTRUCTION & BENCHMARKING APP
+# Groupe G11 - FST Tanger (Vision par Ordinateur)
+# ============================================================================
+
+project:
+  name: "MVS 3D Reconstruction & Evaluation Benchmark"
+  authors: ["Yahya AHMANE", "Yassine KAMOUSS"]
+  data_root: "data/scenes"
+  output_root: "data/outputs"
+
+# Configuration des scènes de référence (Tanks and Temples Benchmark)
+scenes:
+  Ignatius:
+    description: "Statue complexe à 360° (géométrie fine, plis, auto-occultations)"
+    dataset: "Tanks and Temples (Training)"
+    tau_mm: 3.0                  # Seuil officiel d'évaluation F-Score en millimètres (0.003 m)
+    voxel_downsample_m: 0.005    # Taille de voxel par défaut (5 mm) pour l'analyse
+    default_num_views: 30
+  Truck:
+    description: "Véhicule industriel (surfaces métalliques spéculaires, pneus sombres)"
+    dataset: "Tanks and Temples (Training)"
+    tau_mm: 5.0                  # Seuil officiel en millimètres (0.005 m)
+    voxel_downsample_m: 0.010    # Taille de voxel par défaut (10 mm)
+    default_num_views: 30
+  Barn:
+    description: "Bâtiment agricole à grande échelle (structures planes, motifs répétitifs)"
+    dataset: "Tanks and Temples (Training)"
+    tau_mm: 10.0                 # Seuil officiel en millimètres (0.010 m)
+    voxel_downsample_m: 0.015    # Taille de voxel par défaut (15 mm)
+    default_num_views: 40
+
+# Hyperparamètres par défaut du Prétraitement & Recalage 3D (Sim3 + ICP)
+alignment:
+  remove_outliers: true
+  nb_neighbors: 20               # Nombre de voisins pour Statistical Outlier Removal
+  std_ratio: 2.0                 # Seuil d'écart-type pour le filtrage du bruit
+  icp_max_iterations: 50         # Nombre max d'itérations ICP
+  icp_distance_multiplier: 5.0   # Rayon de recherche ICP = multiplier * voxel_size
+  estimate_scale: true           # Indispensable pour VGGT / SfM sans échelle métrique
+
+# Paramètres d'évaluation et de visualisation
+evaluation:
+  max_points_eval: 250000        # Limite de points pour garantir un KD-Tree rapide en local
+  max_points_viz_webgl: 80000    # Limite d'affichage fluide dans Plotly WebGL (Streamlit)
+  fscore_thresholds_mm: [1.0, 2.0, 3.0, 5.0, 7.5, 10.0, 15.0, 20.0, 30.0, 50.0]
+
+# Configuration du Worker GPU Distant (Google Colab API)
+remote_worker:
+  enabled: false
+  api_url: "http://localhost:8000"
+  timeout_seconds: 600

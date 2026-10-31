@@ -1,0 +1,83 @@
+# ==============================================================================
+# Git Ignore Configuration - MVS 3D Reconstruction & Evaluation Benchmark
+# ==============================================================================
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Virtual Environments
+.venv/
+venv/
+ENV/
+env/
+env.bak/
+venv.bak/
+
+# Environment Variables & Secrets
+.env
+.env.local
+.env.*.local
+
+# IDEs and Code Editors
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.project
+.pydevproject
+.settings/
+
+# Jupyter Notebooks
+.ipynb_checkpoints/
+*/.ipynb_checkpoints/*
+
+# Operating System Files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# 3D Reconstruction Data, Datasets & Evaluation Outputs
+# (Keep directory structure via .gitkeep; use `python scripts/setup_data.py --generate-mock` to populate)
+data/scenes/*
+!data/scenes/.gitkeep
+data/outputs/*
+!data/outputs/.gitkeep
+
+# Point Clouds & Large 3D Meshes (prevent accidental large commits)
+*.ply
+*.pcd
+*.las
+*.laz
+*.pts
+*.xyz
+
+# Compressed Archives
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.7z
+*.rar
+
+# Testing, Coverage & Build artifacts
+.pytest_cache/
+.coverage
+htmlcov/
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Logs & Temporary Files
+*.log
+.cache/
+tmp/
+temp/
