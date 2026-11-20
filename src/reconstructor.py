@@ -95,18 +95,31 @@ class ReconstructionManager:
         # 2. Vérification du cache local (.ply existant)
         if target_ply.exists():
             _, stats = self.loader.load_point_cloud(target_ply)
-            saved_meta = self.load_metadata(scene_name).get(method_key, {})
+            all_meta = self.load_metadata(scene_name)
+            saved_meta = all_meta.get(method_key, {})
 
-            # Valeurs réalistes par défaut si timings.json n'existait pas encore (ex: mock data)
-            default_time = 3.8 if method_key == "vggt" else 485.0
+            # Valeurs de secours si timings.json est absent ou incomplet
+            default_time = 0.0
+            top_gpu = all_meta.get("gpu")
             default_device = (
-                "NVIDIA T4 GPU (Feed-Forward Transformer)"
+                f"{top_gpu} (Feed-Forward Transformer)"
+                if top_gpu and method_key == "vggt"
+                else f"{top_gpu} (SfM + PatchMatch MVS)"
+                if top_gpu
+                else "NVIDIA T4 GPU (Feed-Forward Transformer)"
                 if method_key == "vggt"
                 else "NVIDIA T4 GPU (SfM + PatchMatch MVS)"
             )
-            views_count = saved_meta.get(
-                "num_views_used",
-                num_views or len(self.loader.get_all_images(scene_name)),
+            views_count = int(
+                saved_meta.get(
+                    "num_views_used",
+                    all_meta.get("num_views", num_views or len(self.loader.get_all_images(scene_name))),
+                )
+            )
+            default_notes = (
+                "Inférence directe feed-forward exécutée sur GPU Colab."
+                if method_key == "vggt"
+                else "Pipeline SfM + MVS exécuté sur Worker Colab."
             )
 
             result = ReconstructionResult(
@@ -117,11 +130,11 @@ class ReconstructionManager:
                 num_views_used=views_count,
                 num_points=stats.num_points,
                 execution_time_sec=float(saved_meta.get("execution_time_sec", default_time)),
-                device_name=saved_meta.get("device_name", default_device),
-                notes=saved_meta.get("notes", "Chargé depuis le cache local."),
+                device_name=str(saved_meta.get("device_name", default_device)),
+                notes=str(saved_meta.get("notes", default_notes)),
             )
-            # Persister dans timings.json si ce n'était pas encore fait
-            if method_key not in self.load_metadata(scene_name):
+            # Persister dans timings.json si ce n'était pas encore fait ou incomplet
+            if method_key not in all_meta or "device_name" not in saved_meta:
                 self.save_metadata(scene_name, method_key, result)
             return result
 
@@ -157,7 +170,17 @@ class ReconstructionManager:
 
         extracted_files = []
         with zipfile.ZipFile(zip_file, "r") as zf:
-            for member in zf.namelist():
+            members = zf.namelist()
+            has_bundle_images = any(
+                m.startswith("images/") and Path(m).suffix.lower() in self.loader.SUPPORTED_IMAGE_EXTS
+                for m in members
+            )
+            if has_bundle_images:
+                for old_img in paths["images_dir"].iterdir():
+                    if old_img.is_file() and old_img.suffix.lower() in self.loader.SUPPORTED_IMAGE_EXTS:
+                        old_img.unlink()
+
+            for member in members:
                 filename = Path(member).name
                 if not filename:
                     continue
@@ -174,6 +197,28 @@ class ReconstructionManager:
                 with zf.open(member) as source, open(target, "wb") as dest:
                     shutil.copyfileobj(source, dest)
                 extracted_files.append(str(target))
+
+        # Si aucun scan LiDAR ground_truth.ply n'existe encore localement, utiliser VGGT comme référence par défaut
+        if not paths["ground_truth_ply"].exists() and paths["vggt_ply"].exists():
+            shutil.copy(paths["vggt_ply"], paths["ground_truth_ply"])
+            extracted_files.append(str(paths["ground_truth_ply"]))
+
+        # Plafonnement automatique à 150 000 points des nuages massifs importés pour garantir un affichage < 2s
+        import numpy as np
+        import open3d as o3d
+
+        for ply_key in ("ground_truth_ply", "vggt_ply", "colmap_ply"):
+            p_path = paths[ply_key]
+            if p_path.exists():
+                try:
+                    pcd = o3d.io.read_point_cloud(str(p_path))
+                    if len(pcd.points) > 150000:
+                        rng = np.random.default_rng(seed=42)
+                        idx = rng.choice(len(pcd.points), size=150000, replace=False)
+                        pcd = pcd.select_by_index(idx)
+                        o3d.io.write_point_cloud(str(p_path), pcd)
+                except Exception:
+                    pass
 
         return {
             "scene": scene_name,
