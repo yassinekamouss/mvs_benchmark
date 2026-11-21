@@ -6,6 +6,7 @@ Réalisé par : Yahya AHMANE & Yassine KAMOUSS — Encadrant : Pr. M'hamed AIT K
 """
 
 import json
+from pathlib import Path
 import pandas as pd
 import numpy as np
 import streamlit as st
@@ -192,9 +193,19 @@ st.markdown(
 )
 
 paths = loader.get_scene_paths(selected_scene)
+default_bundle = Path("data/bundles") / f"{selected_scene}_bundle.zip"
+if (
+    not paths["ground_truth_ply"].exists()
+    or not paths["vggt_ply"].exists()
+    or not paths["colmap_ply"].exists()
+) and default_bundle.exists():
+    with st.spinner(f"Extraction initiale du bundle `{default_bundle.name}`..."):
+        recon_mgr.import_colab_bundle(default_bundle, selected_scene)
+        st.cache_resource.clear()
+
 if not paths["ground_truth_ply"].exists() and not paths["vggt_ply"].exists():
     st.error(
-        f"Données manquantes pour `{selected_scene}`. Importez un bundle Colab (`<Scene>_bundle.zip`) via la barre latérale ou `python scripts/setup_data.py --import-bundle ...`."
+        f"Données manquantes pour `{selected_scene}`. Lancez `python scripts/setup_data.py --import-all` ou importez un bundle Colab via la barre latérale."
     )
     st.stop()
 

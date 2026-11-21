@@ -44,28 +44,20 @@ venv.bak/
 ehthumbs.db
 Thumbs.db
 
-# 3D Reconstruction Data, Datasets & Evaluation Outputs
-# (Keep directory structure via .gitkeep; use `python scripts/setup_data.py --generate-mock` to populate)
+# Extracted scene data & runtime outputs (populated from data/bundles/*_bundle.zip)
 data/scenes/*
 !data/scenes/.gitkeep
 data/outputs/*
 !data/outputs/.gitkeep
-
-# Point Clouds & Large 3D Meshes (prevent accidental large commits)
-*.ply
-*.pcd
-*.las
-*.laz
-*.pts
-*.xyz
-
-# Compressed Archives
-*.zip
-*.tar
-*.tar.gz
-*.tgz
-*.7z
-*.rar
+data/colab_inputs/
+data/outputs/temp_*.zip
+/*_bundle.zip
+/Ignatius.zip
+/Truck.zip
+/Barn.zip
+/Ignatius.ply
+/Truck.ply
+/Barn.ply
 
 # Testing, Coverage & Build artifacts
 .pytest_cache/

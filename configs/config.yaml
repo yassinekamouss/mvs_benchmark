@@ -28,7 +28,7 @@ scenes:
     dataset: "Tanks and Temples (Training)"
     tau_mm: 10.0                 # Seuil officiel en millimètres (0.010 m)
     voxel_downsample_m: 0.015    # Taille de voxel par défaut (15 mm)
-    default_num_views: 40
+    default_num_views: 30
 
 # Hyperparamètres par défaut du Prétraitement & Recalage 3D (Sim3 + ICP)
 alignment:
