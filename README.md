@@ -113,7 +113,7 @@ mvs-benchmark-app/
 
 ### 4.1. Échantillonnage Multi-Vues à $360^\circ$
 Pour chaque scène contenant $M$ photographies haute définition, `SceneDataLoader.get_sampled_images` sélectionne $N = 30$ vues uniformément espacées sur la séquence orbitale par interpolation linéaire des indices :
-$$i_k = \left\lfloor k \cdot \frac{M - 1}{N - 1} \right\rfloor, \quad k \in \{0, \dots, N-1\}$$
+$$i_k = \left\lfloor k \cdot \frac{M - 1}{N - 1} \right\rfloor, \quad k \in \lbrace 0, \dots, N-1 \rbrace$$
 
 ### 4.2. Paradigmes de Reconstruction Confrontés
 * **VGGT-1B (`facebook/VGGT-1B`)** : Transformer *feed-forward* prenant simultanément les $N$ images sans paramètres intrinsèques ni extrinsèques connus. Les points 3D prédits sont filtrés au $40^\text{e}$ centile de la carte de confiance `world_points_conf` puis nettoyés par filtrage statistique des valeurs aberrantes (*Statistical Outlier Removal*, `nb_neighbors=20`, `std_ratio=2.0`).
@@ -122,28 +122,28 @@ $$i_k = \left\lfloor k \cdot \frac{M - 1}{N - 1} \right\rfloor, \quad k \in \{0,
 ### 4.3. Recalage Spatial $Sim(3)$ & Pyramide ICP Multi-Échelles (`src/alignment.py`)
 Les nuages reconstruits par VGGT et COLMAP étant définis dans un repère arbitraire à un **facteur d'échelle inconnu $s > 0$** près, la comparaison directe au scan LiDAR impose d'estimer une transformation de similitude rigide $T \in Sim(3)$ :
 
-$$\mathbf{p}' = s\,\mathbf{R}\,\mathbf{p} + \mathbf{t}, \quad s \in \mathbb{R}_+^*,\; \mathbf{R} \in SO(3),\; \mathbf{t} \in \mathbb{R}^3$$
+$$\mathbf{p}' = s \mathbf{R} \mathbf{p} + \mathbf{t}, \quad s \in \mathbb{R}_+^*, \quad \mathbf{R} \in SO(3), \quad \mathbf{t} \in \mathbb{R}^3$$
 
 Le moteur `PointCloudAligner` procède en trois étapes :
 1. **Prétraitement** : Filtrage statistique SOR (`nb_neighbors=20`, `std_ratio=2.0`) et sous-échantillonnage par grille de voxels (`voxel_size` adapté à la scène).
 2. **Initialisation Globale $Sim(3)$ (`compute_initial_sim3`)** : Estimation conjointe de deux échelles candidates (rapport des distances médianes au centroïde et rapport des étendues robustes 2 %–98 %) combinées aux 4 hypothèses d'orientation des axes principaux obtenues par décomposition en valeurs singulières (PCA/SVD, avec correction de déterminant $\det(\mathbf{R}) = +1$), évaluées sur critère de recouvrement (*fitness* et RMSE).
-3. **Affinement ICP Multi-Échelles avec Garde-Fou** : Pyramide *Point-to-Point* avec estimation d'échelle (`with_scaling=True`) sur trois rayons décroissants ($3.5\,d_0 \rightarrow 2.0\,d_0 \rightarrow 1.0\,d_0$, où $d_0 = 5 \cdot \text{voxel\_size}$), protégée par un garde-fou anti-effondrement rejetant toute dérive d'échelle hors de $[0.65\,s_{\text{init}},\, 1.35\,s_{\text{init}}]$.
+3. **Affinement ICP Multi-Échelles avec Garde-Fou** : Pyramide *Point-to-Point* avec estimation d'échelle (`with_scaling=True`) sur trois rayons décroissants ($3.5 d_0 \rightarrow 2.0 d_0 \rightarrow 1.0 d_0$, où $d_0 = 5 \times$ `voxel_size`), protégée par un garde-fou anti-effondrement rejetant toute dérive d'échelle hors de $[0.65 s_{\text{init}}, 1.35 s_{\text{init}}]$.
 
 ### 4.4. Métriques Géométriques via Arbres KD-Tree (`src/metrics.py`)
-Soient $P = \{p_i\}$ le nuage reconstruit recalé et $G = \{g_j\}$ le nuage de référence (LiDAR *Tanks and Temples* ou VGGT). Grâce à `scipy.spatial.cKDTree` (indexation C++ multi-threadée), nous calculons les deux champs de distances directionnelles en millimètres :
+Soient $P = \lbrace p_i \rbrace$ le nuage reconstruit recalé et $G = \lbrace g_j \rbrace$ le nuage de référence (LiDAR *Tanks and Temples* ou VGGT). Grâce à `scipy.spatial.cKDTree` (indexation C++ multi-threadée), nous calculons les deux champs de distances directionnelles en millimètres :
 
-$$d(p, G) = \min_{g \in G} \|p - g\|_2, \qquad d(g, P) = \min_{p \in P} \|g - p\|_2$$
+$$d(p, G) = \min_{g \in G} \lVert p - g \rVert_2, \qquad d(g, P) = \min_{p \in P} \lVert g - p \rVert_2$$
 
 À partir de ces distributions, l'évaluateur extrait les métriques standards des benchmarks DTU et *Tanks and Temples* :
 
 | Métrique | Définition mathématique | Interprétation |
 | :--- | :--- | :--- |
-| **Accuracy (mm)** $\downarrow$ | $\frac{1}{\|P\|}\sum_{p \in P} d(p, G)$ | Exactitude géométrique des points générés par rapport à la référence |
-| **Completeness (mm)** $\downarrow$ | $\frac{1}{\|G\|}\sum_{g \in G} d(g, P)$ | Couverture de la surface réelle (détecte les trous / zones manquantes) |
+| **Accuracy (mm)** $\downarrow$ | $\frac{1}{\lvert P \rvert}\sum_{p \in P} d(p, G)$ | Exactitude géométrique des points générés par rapport à la référence |
+| **Completeness (mm)** $\downarrow$ | $\frac{1}{\lvert G \rvert}\sum_{g \in G} d(g, P)$ | Couverture de la surface réelle (détecte les trous / zones manquantes) |
 | **Chamfer Distance (mm)** $\downarrow$ | $\frac{1}{2}\big(\text{Accuracy} + \text{Completeness}\big)$ | Erreur symétrique globale entre les deux nuages |
-| **Hausdorff 95% (mm)** $\downarrow$ | $\text{Percentile}_{95}\big(\{d(p,G)\} \cup \{d(g,P)\}\big)$ | Pire déviation locale robuste aux points isolés extrêmes |
-| **Précision @ $\tau$ (%)** $\uparrow$ | $\frac{100}{\|P\|}\sum_{p \in P} \mathbb{1}\big(d(p, G) < \tau\big)$ | Part des points reconstruits valides sous le seuil officiel $\tau$ |
-| **Rappel @ $\tau$ (%)** $\uparrow$ | $\frac{100}{\|G\|}\sum_{g \in G} \mathbb{1}\big(d(g, P) < \tau\big)$ | Part de la référence fidèlement reconstruite sous $\tau$ |
+| **Hausdorff 95% (mm)** $\downarrow$ | $\text{Percentile}_{95}\big(\lbrace d(p,G) \rbrace \cup \lbrace d(g,P) \rbrace\big)$ | Pire déviation locale robuste aux points isolés extrêmes |
+| **Précision @ $\tau$ (%)** $\uparrow$ | $\frac{100}{\lvert P \rvert}\sum_{p \in P} \mathbf{1}\big(d(p, G) < \tau\big)$ | Part des points reconstruits valides sous le seuil officiel $\tau$ |
+| **Rappel @ $\tau$ (%)** $\uparrow$ | $\frac{100}{\lvert G \rvert}\sum_{g \in G} \mathbf{1}\big(d(g, P) < \tau\big)$ | Part de la référence fidèlement reconstruite sous $\tau$ |
 | **F-Score @ $\tau$ (%)** $\uparrow$ | $\dfrac{2 \cdot \text{Précision}(\tau) \cdot \text{Rappel}(\tau)}{\text{Précision}(\tau) + \text{Rappel}(\tau)}$ | Score synthétique officiel du benchmark *Tanks and Temples* |
 
 ---
@@ -162,7 +162,7 @@ Les mesures ci-dessous proviennent des exécutions réelles sur **Google Colab (
 
 ### 5.2. Qualité Géométrique Après Recalage $Sim(3)$ + ICP
 
-#### Scène `Ignatius` ($\tau = 3.0\text{ mm}$, voxel $= 5.0\text{ mm}$, LiDAR GT $= 150\,000\text{ pts}$, diagonale $= 3.643\text{ m}$)
+#### Scène `Ignatius` ($\tau = 3.0\text{ mm}$, voxel = 5.0 mm, LiDAR GT = 150 000 pts, diagonale = 3.643 m)
 
 | Comparaison | Échelle $s$ | Fitness ICP | Accuracy (mm) $\downarrow$ | Accuracy Méd. (mm) $\downarrow$ | Completeness (mm) $\downarrow$ | Chamfer (mm) $\downarrow$ | Hausdorff 95% (mm) $\downarrow$ | Précision @ 3mm $\uparrow$ | Précision @ 50mm $\uparrow$ | F-Score @ 3mm $\uparrow$ | F-Score @ 50mm $\uparrow$ |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
@@ -170,7 +170,7 @@ Les mesures ci-dessous proviennent des exécutions réelles sur **Google Colab (
 | **COLMAP vs GT LiDAR** | 0.0262 | **61.7 %** | **48.24** | **17.24** | **258.43** | **153.34** | **558.47** | **2.31 %** | **83.67 %** | 0.18 % | 15.97 % |
 | **COLMAP vs VGGT (Réf)** | — | — | 72.46 | 38.15 | 105.59 | 89.02 | 258.70 | 1.43 % | 62.71 % | 0.94 % | 38.46 % |
 
-#### Scène `Truck` ($\tau = 5.0\text{ mm}$, voxel $= 10.0\text{ mm}$, LiDAR GT $= 150\,000\text{ pts}$, diagonale $= 10.820\text{ m}$)
+#### Scène `Truck` ($\tau = 5.0\text{ mm}$, voxel = 10.0 mm, LiDAR GT = 150 000 pts, diagonale = 10.820 m)
 
 | Comparaison | Échelle $s$ | Fitness ICP | Accuracy (mm) $\downarrow$ | Accuracy Méd. (mm) $\downarrow$ | Completeness (mm) $\downarrow$ | Chamfer (mm) $\downarrow$ | Hausdorff 95% (mm) $\downarrow$ | Précision @ 5mm $\uparrow$ | Précision @ 50mm $\uparrow$ | F-Score @ 5mm $\uparrow$ | F-Score @ 50mm $\uparrow$ |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
@@ -178,7 +178,7 @@ Les mesures ci-dessous proviennent des exécutions réelles sur **Google Colab (
 | **COLMAP vs GT LiDAR** | 0.1707 | **46.6 %** | **227.70** | **28.79** | 1 537.98 | 882.84 | 3 143.53 | **1.70 %** | **61.80 %** | **0.23 %** | 2.92 % |
 | **COLMAP vs VGGT (Réf)** | — | — | 1 007.84 | 857.54 | 1 278.06 | 1 142.95 | 2 616.13 | 0.00 % | 0.05 % | 0.00 % | 0.08 % |
 
-#### Scène `Barn` ($\tau = 10.0\text{ mm}$, voxel $= 15.0\text{ mm}$, LiDAR GT $= 150\,000\text{ pts}$, diagonale $= 25.802\text{ m}$)
+#### Scène `Barn` ($\tau = 10.0\text{ mm}$, voxel = 15.0 mm, LiDAR GT = 150 000 pts, diagonale = 25.802 m)
 
 | Comparaison | Échelle $s$ | Fitness ICP | Accuracy (mm) $\downarrow$ | Completeness (mm) $\downarrow$ | Chamfer (mm) $\downarrow$ | Hausdorff 95% (mm) $\downarrow$ | F-Score @ 10mm $\uparrow$ |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
